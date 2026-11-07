@@ -16,8 +16,19 @@ const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const NON_JSON_ROUTES = [/^\/api\/v1\/admin\/uploads\/image$/, /^\/api\/v1\/payments\/mpesa\/callback\//, /^\/api\/v1\/payments\/paystack\/webhook$/];
 const SENSITIVE_NO_STORE = /^\/api\/v1\/(admin|auth|account|orders|checkout|cart)(\/|$)/;
 
+const toOrigin = (u: string) => {
+  try {
+    return new URL(u).origin; // ADMIN_URL may carry a path (https://shop.co.ke/admin); browsers send only the origin
+  } catch {
+    return u.replace(/\/$/, '');
+  }
+};
+
 export function allowedOrigins() {
-  return [env.storefrontUrl, env.adminUrl].map((u) => u.replace(/\/$/, ''));
+  const list = [env.storefrontUrl, env.adminUrl].map(toOrigin);
+  // Vercel preview deployments are served from their own generated hostnames.
+  for (const host of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]) if (host) list.push(`https://${host}`);
+  return [...new Set(list)];
 }
 
 function reject(res: Response, statusCode: number, message: string) {

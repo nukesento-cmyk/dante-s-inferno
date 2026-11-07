@@ -26,6 +26,7 @@ import {
 import { memoryStorage } from 'multer';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { put } from '@vercel/blob';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { AuditActor, Staff } from '../auth/guards';
@@ -84,10 +85,17 @@ export class AdminCatalogueController {
     if (!ext) throw new BadRequestException('Only JPEG, PNG, WebP, GIF or AVIF images are allowed');
     // The name is generated here and the extension comes from the sniffed bytes, never from the client.
     const filename = `${randomUUID()}${ext}`;
-    await mkdir(UPLOADS_DIR, { recursive: true });
-    await writeFile(join(UPLOADS_DIR, filename), file.buffer, { flag: 'wx', mode: 0o644 });
+    let url = `/uploads/${filename}`;
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      // Serverless (Vercel): the local disk is not persistent, so store the image in Vercel Blob.
+      const blob = await put(`products/${filename}`, file.buffer, { access: 'public', contentType: file.mimetype, addRandomSuffix: false });
+      url = blob.url;
+    } else {
+      await mkdir(UPLOADS_DIR, { recursive: true });
+      await writeFile(join(UPLOADS_DIR, filename), file.buffer, { flag: 'wx', mode: 0o644 });
+    }
     await this.audit.log(actor, { action: 'upload.image', entity: 'Upload', entityId: filename, after: { filename, bytes: file.size, type: ext } });
-    return { url: `/uploads/${filename}` };
+    return { url };
   }
 
   // categories

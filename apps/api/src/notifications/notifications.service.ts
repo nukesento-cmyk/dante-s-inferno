@@ -1,3 +1,4 @@
+import { waitUntil } from '@vercel/functions';
 import { Injectable, Logger } from '@nestjs/common';
 import type { NotificationAudience, NotificationChannel, NotificationEvent } from '@prisma/client';
 import { formatKes, renderTemplate } from '@dantes/shared';
@@ -40,7 +41,8 @@ export class NotificationsService {
 
   /** Fire and forget: call after the DB transaction has committed. Never throws. */
   notify(event: NotificationEvent, orderId: string) {
-    void this.dispatch(event, orderId).catch((err) => this.logger.error(`dispatch ${event} for ${orderId} failed: ${err}`));
+    // waitUntil keeps a serverless function alive until the dispatch finishes; a no-op elsewhere.
+    waitUntil(this.dispatch(event, orderId).catch((err) => this.logger.error(`dispatch ${event} for ${orderId} failed: ${err}`)));
   }
 
   async dispatch(event: NotificationEvent, orderId: string) {

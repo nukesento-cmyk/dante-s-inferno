@@ -9,15 +9,18 @@ for (const file of [resolve(process.cwd(), '.env'), resolve(__dirname, '../../.e
   }
 }
 
-const str = (key: string, fallback = '') => process.env[key] ?? fallback;
+const str = (key: string, fallback = '') => process.env[key] || fallback;
+
+/** On Vercel the production domain is known; use it when the URL variables are not set explicitly. */
+const vercelOrigin = () => (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : '');
 
 export const env = {
   get nodeEnv() { return str('NODE_ENV', 'development'); },
   get isProduction() { return this.nodeEnv === 'production'; },
   get port() { return Number(str('API_PORT', '4000')); },
-  get publicApiUrl() { return str('PUBLIC_API_URL', 'http://localhost:4000'); },
-  get storefrontUrl() { return str('STOREFRONT_URL', 'http://localhost:5173'); },
-  get adminUrl() { return str('ADMIN_URL', 'http://localhost:5174'); },
+  get publicApiUrl() { return str('PUBLIC_API_URL', vercelOrigin() || 'http://localhost:4000'); },
+  get storefrontUrl() { return str('STOREFRONT_URL', vercelOrigin() || 'http://localhost:5173'); },
+  get adminUrl() { return str('ADMIN_URL', vercelOrigin() ? `${vercelOrigin()}/admin` : 'http://localhost:5174'); },
   get jwtSecret() { return str('JWT_SECRET', 'dev-secret'); },
   get paymentsMode() { return str('PAYMENTS_MODE', 'mock') === 'live' ? ('live' as const) : ('mock' as const); },
   get loginRateLimit() { return Number(str('LOGIN_RATE_LIMIT', '10')); },
@@ -67,6 +70,7 @@ const envSchema = z
     MPESA_ENV: z.enum(['sandbox', 'production']).optional(),
     MPESA_CALLBACK_SECRET: z.string().optional(),
     PAYSTACK_SECRET_KEY: z.string().optional(),
+    VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
   })
   .passthrough()
   .superRefine((v, ctx) => {
@@ -75,6 +79,7 @@ const envSchema = z
     const secret = v.JWT_SECRET ?? '';
     if (secret.length < 32 || WEAK_SECRETS.test(secret)) issue('JWT_SECRET', 'must be a random value of at least 32 characters in production (e.g. openssl rand -base64 48)');
     for (const key of ['STOREFRONT_URL', 'ADMIN_URL'] as const) {
+      if (!v[key] && v.VERCEL_PROJECT_PRODUCTION_URL) continue; // derived from the Vercel production domain
       if (!v[key]) issue(key, 'is required in production (it is the only allowed CORS origin)');
       else if (!v[key]!.startsWith('https://')) issue(key, 'must be an https:// URL in production');
     }

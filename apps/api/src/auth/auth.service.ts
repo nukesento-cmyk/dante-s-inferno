@@ -1,3 +1,4 @@
+import { waitUntil } from '@vercel/functions';
 import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@prisma/client';
@@ -131,9 +132,11 @@ export class AuthService {
     });
     const link = `${env.storefrontUrl}/reset-password?token=${token}`;
     // Not awaited: the response time must not reveal whether the address has an account.
-    void this.email
-      .send(user.email, "Reset your Dante's Pizza password", `Hi ${user.name},\n\nReset your password here (valid for 1 hour): ${link}\n\nIf you did not ask for this, ignore this email.`)
-      .catch(() => undefined);
+    waitUntil(
+      this.email
+        .send(user.email, "Reset your Dante's Pizza password", `Hi ${user.name},\n\nReset your password here (valid for 1 hour): ${link}\n\nIf you did not ask for this, ignore this email.`)
+        .catch(() => undefined),
+    );
   }
 
   async resetPassword(token: string, password: string) {

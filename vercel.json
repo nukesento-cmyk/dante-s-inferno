@@ -1,0 +1,103 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": "apps/api",
+      "framework": "nestjs",
+      "entrypoint": "src/main.ts",
+      "installCommand": "cd ../.. && npx --yes pnpm@12.16.1 install --frozen-lockfile",
+      "buildCommand": "bash ../../scripts/vercel-api-build.sh",
+      "functions": {
+        "src/main.ts": {
+          "maxDuration": 300
+        }
+      }
+    },
+    "admin": {
+      "root": "apps/admin",
+      "framework": "vite",
+      "installCommand": "cd ../.. && npx --yes pnpm@12.16.1 install --frozen-lockfile",
+      "buildCommand": "cd ../.. && npx --yes pnpm@12.16.1 turbo run build --filter=@dantes/admin",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/admin/assets/:path*",
+          "destination": "/assets/:path*"
+        },
+        {
+          "source": "/admin/:file([^/]+\\.[a-z0-9]+)",
+          "destination": "/:file"
+        },
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    "storefront": {
+      "root": "apps/storefront",
+      "framework": "vite",
+      "installCommand": "cd ../.. && npx --yes pnpm@12.16.1 install --frozen-lockfile",
+      "buildCommand": "cd ../.. && npx --yes pnpm@12.16.1 turbo run build --filter=@dantes/storefront",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ]
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/admin",
+      "destination": {
+        "service": "admin"
+      }
+    },
+    {
+      "source": "/admin/(.*)",
+      "destination": {
+        "service": "admin"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "storefront"
+      }
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/admin/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}

@@ -30,3 +30,6 @@ test-results/
 
 # Database backups (scripts/backup.sh)
 backups/
+
+# Vercel
+.vercel/

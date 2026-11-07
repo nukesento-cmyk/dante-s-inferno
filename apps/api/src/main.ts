@@ -12,7 +12,8 @@ async function main() {
   app.useLogger(new JsonLogger());
   configureApp(app, { swagger: !env.isProduction, requestLog: true });
   app.enableShutdownHooks();
-  await app.listen(env.port);
+  // Vercel (and most hosts) assign PORT; API_PORT is the local default.
+  await app.listen(Number(process.env.PORT ?? env.port));
   new Logger('Bootstrap').log(`API listening on :${env.port} (payments: ${env.paymentsMode})`);
 }
 

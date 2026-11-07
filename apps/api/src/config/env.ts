@@ -50,7 +50,8 @@ export const env = {
 };
 
 const WEAK_SECRETS = /^(change-?me|dev-secret|secret|password|jwt|test)/i;
-const url = z.string().url();
+// Empty counts as unset: the value is then derived (Vercel domain) or defaulted.
+const url = z.union([z.literal(''), z.string().url()]);
 const optionalNumber = z.string().regex(/^\d+$/, 'must be a whole number').optional();
 
 const envSchema = z

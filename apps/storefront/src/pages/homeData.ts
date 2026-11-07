@@ -9,10 +9,3 @@ export const FALLBACK_INGREDIENTS: Pick<Ingredient, 'id' | 'slug' | 'name' | 'de
   { id: 'f5', slug: 'red-onion', name: 'Red onion', description: 'Thin rings that turn sweet and jammy in the heat.', modelKey: 'onion', color: '#a0407f', surchargeCents: 0 },
   { id: 'f6', slug: 'basil', name: 'Fresh basil', description: 'Torn leaves added at the end for a fragrant lift.', modelKey: 'basil', color: '#2f8a3a', surchargeCents: 0 },
 ];
-
-export const photos = {
-  hero: '/images/idlePage.jpg',
-  basil: '/images/narek-petrosyan--0nj85eRLPk-unsplash.jpg',
-  closeup: '/images/aldward-castillo-mbDTDm_s9C0-unsplash.jpg',
-  board: '/images/faizan-saeed-8thte7ceLSw-unsplash.jpg',
-};

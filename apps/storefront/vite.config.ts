@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// NOTE: @vitejs/plugin-react@6 needs vite>=7 (imports vite/internal); the installed vite is 6, so JSX goes through esbuild (react-jsx).
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [react(), tailwindcss()],
   publicDir: '../../public',
   server: {
     port: 5173,

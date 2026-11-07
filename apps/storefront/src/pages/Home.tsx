@@ -1,4 +1,4 @@
-import { Suspense, lazy, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -6,7 +6,8 @@ import Lenis from 'lenis';
 import { formatKenyanPhone, formatKes } from '@dantes/shared';
 import { useMenu, useSettings, useZones } from '../hooks/queries';
 import { useTitle } from '../hooks/useTitle';
-import { hasWebGL, prefersReducedMotion } from '../lib/webgl';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { hasWebGL } from '../lib/webgl';
 import { weeklyHours } from '../lib/hours';
 import { sceneState, type SceneSection } from '../scenes/sceneState';
 import type { CloudItem } from '../scenes/HomeScene';
@@ -15,7 +16,9 @@ import { Footer } from '../components/Layout';
 import { OpenBadge } from '../components/OpenBadge';
 import { ProductCard } from '../components/ProductCard';
 import { ErrorBox, Loading } from '../components/States';
-import { FALLBACK_INGREDIENTS, photos } from './homeData';
+import { WebImage } from '../components/WebImage';
+import { HERO_IMAGES, IDLE_IMAGE, type HeroImage } from '../data/heroImages';
+import { FALLBACK_INGREDIENTS } from './homeData';
 
 // three.js lives in this chunk only (plus the customizer).
 const HomeScene = lazy(() => import('../scenes/HomeScene'));
@@ -28,15 +31,63 @@ const LAYERS = [
 ] as const;
 
 const SCENE_SECTIONS = new Set<SceneSection>(['portal', 'anatomy', 'universe', 'fire', 'final']);
+const HERO_INTERVAL_MS = 8000;
+const FINAL_IMAGE = HERO_IMAGES[0]!; // hero1: moody table
+const byName = (name: string) => HERO_IMAGES.find((h) => h.name === name)!;
+
+/** Dim photo behind a section. With several images it slowly crossfades (no controls: it is atmosphere, not content). */
+function Backdrop({ images, center = false, reduced, priority = false }: { images: HeroImage[]; center?: boolean; reduced: boolean; priority?: boolean }) {
+  const [index, setIndex] = useState(0);
+  const [prev, setPrev] = useState<number | null>(null);
+  const multi = images.length > 1 && !reduced;
+
+  useEffect(() => {
+    if (!multi) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      setIndex((i) => {
+        setPrev(i);
+        return (i + 1) % images.length;
+      });
+    }, HERO_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [multi, images.length]);
+
+  return (
+    <div className="backdrop" aria-hidden="true">
+      {images.map((img, i) => {
+        // Mount only the visible image, the one fading out and the next one (preloading it).
+        const next = (index + 1) % images.length;
+        if (i !== index && i !== prev && !(multi && i === next)) return null;
+        return (
+          <div key={img.name} className={`backdrop-layer ${i === index ? 'is-on' : ''}`}>
+            <WebImage
+              name={img.name}
+              alt=""
+              fill
+              priority={priority && i === 0}
+              lazy={!(priority && i === 0)}
+              className={`backdrop-photo ${reduced ? '' : `backdrop-kb kb-${img.kb}`}`}
+              imgStyle={img.position ? { objectPosition: img.position } : undefined}
+            />
+          </div>
+        );
+      })}
+      <div className={`backdrop-shade ${center ? 'is-center' : ''}`} />
+    </div>
+  );
+}
 
 export default function Home() {
   useTitle('Freshly made. Boldly different.');
   const { data: menu, isLoading: menuLoading, error: menuError, refetch } = useMenu();
   const { data: settings } = useSettings();
   const { data: zones } = useZones();
-  const rich = useMemo(() => hasWebGL() && !prefersReducedMotion(), []);
+  const reduced = useReducedMotion();
+  const rich = useMemo(() => hasWebGL(), []) && !reduced;
   const [section, setSection] = useState<SceneSection>('portal');
   const [picked, setPicked] = useState<string | null>(null);
+  const [pastHero, setPastHero] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   const ingredients = useMemo(() => {
@@ -57,6 +108,15 @@ export default function Home() {
   const teaserProduct = menu?.products.find((p) => p.featured) ?? menu?.products[0];
   const shown = ingredients.find((i) => i.slug === picked);
 
+  // Mobile order bar appears once the hero has scrolled out of view.
+  useEffect(() => {
+    const el = document.getElementById('sec-portal');
+    if (!el || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(([e]) => setPastHero(!e!.isIntersecting), { threshold: 0.15 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useLayoutEffect(() => {
     if (!rich) return;
     gsap.registerPlugin(ScrollTrigger);
@@ -67,32 +127,33 @@ export default function Home() {
     gsap.ticker.lagSmoothing(0);
 
     const ctx = gsap.context(() => {
-      const track = (id: SceneSection, el: string) =>
-        ScrollTrigger.create({
-          trigger: el,
-          start: 'top 55%',
-          end: 'bottom 55%',
-          onToggle: (self) => {
-            if (self.isActive) {
-              sceneState.section = id;
-              setSection(id);
-            }
-          },
-        });
-      track('portal', '#wrap-portal');
-      track('anatomy', '#wrap-anatomy');
-      track('universe', '#wrap-universe');
-      track('fire', '#wrap-fire');
-      track('off', '#solid-zone');
-      track('final', '#wrap-final');
-
-      gsap.from('.hero-title .w > span', { yPercent: 110, duration: 1.1, stagger: 0.09, ease: 'power4.out', delay: 0.2 });
-      gsap.from('.hero-fade', { opacity: 0, y: 24, duration: 1, stagger: 0.15, delay: 0.7 });
-
+      // The pin must exist before the other triggers so their start/end include its extra scroll length.
       gsap
         .timeline({ scrollTrigger: { trigger: '#sec-anatomy', start: 'top top', end: '+=220%', pin: true, scrub: 0.6 } })
         .to(sceneState, { explode: 1, duration: 1.2, ease: 'power2.inOut' }, 0)
         .to('.anat-label', { opacity: 1, duration: 0.3, stagger: 0.3 }, 0.3);
+
+      // Which scene section is live is re-derived after every toggle, so jumps (End key, anchors) land correctly.
+      const tracked: { id: SceneSection; st: ScrollTrigger }[] = [];
+      const sync = () => {
+        const live = tracked.filter((t) => t.st.isActive).pop();
+        if (live && sceneState.section !== live.id) {
+          sceneState.section = live.id;
+          setSection(live.id);
+        }
+      };
+      const track = (id: SceneSection, el: string, start = 'top 55%', end = 'bottom 55%') =>
+        tracked.push({ id, st: ScrollTrigger.create({ trigger: el, start, end, onToggle: sync }) });
+      track('portal', '#wrap-portal');
+      track('anatomy', '#wrap-anatomy');
+      track('universe', '#wrap-universe');
+      track('fire', '#wrap-fire');
+      track('off', '#solid-zone', 'top 55%', 'bottom 85%');
+      // last section: the page cannot scroll its top up to 55%, so it starts earlier
+      track('final', '#wrap-final', 'top 85%');
+
+      gsap.from('.hero-title .w > span', { yPercent: 110, duration: 1.1, stagger: 0.09, ease: 'power4.out', delay: 0.2 });
+      gsap.from('.hero-fade', { opacity: 0, y: 24, duration: 1, stagger: 0.15, delay: 0.7 });
 
       ScrollTrigger.create({
         trigger: '#sec-fire',
@@ -105,7 +166,17 @@ export default function Home() {
       });
     }, root);
 
+    // Menu, zones and settings arrive after mount and change the page height: re-measure every trigger.
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => ScrollTrigger.refresh());
+    });
+    if (root.current) ro.observe(root.current);
+
     return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
       ctx.revert();
       gsap.ticker.remove(tick);
       lenis.destroy();
@@ -122,10 +193,9 @@ export default function Home() {
   };
   const words = ['Freshly', 'made.', 'Boldly', 'different.'];
   const sceneVisible = rich && SCENE_SECTIONS.has(section);
-  const photoBg = (src: string) => (rich ? null : <div className="photo-bg" style={{ backgroundImage: `url(${src})` }} aria-hidden="true" />);
 
   return (
-    <div className="home" ref={root}>
+    <div className={`home ${rich ? 'is-rich' : ''}`} ref={root} data-section={section}>
       {rich && (
         <div className="scene-canvas" style={{ opacity: sceneVisible ? 1 : 0 }} aria-hidden="true">
           <ErrorBoundary fallback={null}>
@@ -139,8 +209,7 @@ export default function Home() {
       {/* 01 THE PORTAL */}
       <div id="wrap-portal">
         <section id="sec-portal" className="sec" aria-labelledby="h-portal">
-          <div className="portal-bg" aria-hidden="true" />
-          {photoBg(photos.hero)}
+          <Backdrop images={HERO_IMAGES} reduced={reduced} priority />
           <div className="container-x">
             <div className="hero-copy">
               <p className="eyebrow hero-fade">01 · The Portal</p>
@@ -162,10 +231,9 @@ export default function Home() {
         </section>
       </div>
 
-      {/* 02 THE ANATOMY */}
+      {/* 02 THE ANATOMY: plain stage so the exploding layers read clearly */}
       <div id="wrap-anatomy">
         <section id="sec-anatomy" className="sec anatomy" aria-labelledby="h-anatomy">
-          {photoBg(photos.closeup)}
           <div className="container-x" style={{ position: 'relative', height: rich ? '80svh' : undefined }}>
             <p className="eyebrow">02 · The Anatomy</p>
             <h2 id="h-anatomy">Four layers.<br />Zero shortcuts.</h2>
@@ -214,7 +282,7 @@ export default function Home() {
               {shown ? (
                 <>
                   <h3>{shown.name}</h3>
-                  <p className="muted" style={{ margin: 0 }}>{shown.description || 'A Dante\'s favourite.'}</p>
+                  <p className="muted" style={{ margin: 0 }}>{shown.description || "A Dante's favourite."}</p>
                 </>
               ) : (
                 <p className="muted" style={{ margin: 0 }}>Pick an ingredient.</p>
@@ -224,10 +292,10 @@ export default function Home() {
         </section>
       </div>
 
-      {/* 04 FIRE DIMENSION */}
+      {/* 04 FIRE DIMENSION: the real oven behind the baking pizza */}
       <div id="wrap-fire">
         <section id="sec-fire" className="sec fire-sec" aria-labelledby="h-fire">
-          {photoBg(photos.hero)}
+          <Backdrop images={[IDLE_IMAGE]} center reduced={reduced} />
           <div className="fire-stick">
             <div className="container-x">
               <div className="fire-copy">
@@ -266,7 +334,9 @@ export default function Home() {
               <p className="muted" style={{ maxWidth: '46ch' }}>Pick your size, choose your crust, pile on extras or drop what you do not love. The pizza and the price update as you go.</p>
               <Link to={teaserProduct ? `/customize/${teaserProduct.id}` : '/menu'} className="btn btn-primary btn-lg">Start building</Link>
             </div>
-            <div className="teaser-img"><img src={photos.basil} alt="A pizza topped with fresh basil, seen from above" loading="lazy" /></div>
+            <div className="teaser-img">
+              <WebImage name="hero3" alt={byName('hero3').alt} sizes="(min-width: 900px) 50vw, 100vw" lazy />
+            </div>
           </div>
         </section>
 
@@ -278,8 +348,8 @@ export default function Home() {
             <div className="split split-eq" style={{ alignItems: 'center', marginBottom: 32 }}>
               <p>Dante's is made for people who want more from dinner. Every box is built to order, baked hot and handled with care. Choose delivery to your area, or collect it fresh from the restaurant.</p>
               <div className="exp-photos" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                <img src={photos.board} alt="A pizza on a wooden serving board" loading="lazy" />
-                <img src={photos.closeup} alt="Close-up of melted cheese and basil on a pizza" loading="lazy" />
+                <WebImage name="hero7" alt={byName('hero7').alt} sizes="(min-width: 900px) 25vw, 50vw" lazy />
+                <WebImage name="hero6" alt={byName('hero6').alt} sizes="(min-width: 900px) 25vw, 50vw" lazy />
               </div>
             </div>
             <h3>Delivery areas</h3>
@@ -302,13 +372,13 @@ export default function Home() {
       {/* 08 FINAL PORTAL */}
       <div id="wrap-final">
         <section id="sec-final" className="sec final-sec" aria-labelledby="h-final" style={{ alignItems: 'end' }}>
-          {photoBg(photos.hero)}
+          <Backdrop images={[FINAL_IMAGE]} center reduced={reduced} />
           <div className="container-x" style={{ display: 'grid', justifyItems: 'center', gap: 16 }}>
             <p className="eyebrow">08 · Final Portal</p>
             <h2 id="h-final" className="hero-title" style={{ fontSize: 'clamp(2.2rem,8vw,5rem)' }}>Hungry yet?</h2>
             <Link to="/menu" className="btn btn-primary btn-lg">Order now</Link>
             {settings && (
-              <div className="panel" style={{ marginTop: 20, display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', textAlign: 'left', width: '100%', background: 'rgba(28,28,33,.85)' }}>
+              <div className="panel" style={{ marginTop: 20, display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', textAlign: 'left', width: '100%', background: 'rgba(28,28,33,.92)' }}>
                 <div>
                   <OpenBadge settings={settings} />
                   <p style={{ marginTop: 12 }}>{settings.address}</p>
@@ -322,6 +392,11 @@ export default function Home() {
             )}
           </div>
         </section>
+      </div>
+
+      <div className={`mobile-cta ${pastHero ? 'is-on' : ''}`} aria-hidden={!pastHero}>
+        <strong>DANTE'S PIZZA</strong>
+        <Link to="/menu" className="btn btn-primary" tabIndex={pastHero ? 0 : -1}>Order now</Link>
       </div>
       <Footer />
     </div>

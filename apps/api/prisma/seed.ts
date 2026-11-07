@@ -64,7 +64,7 @@ const PRODUCTS: ProductSeed[] = [
     description: 'Grilled chicken, onion and sweetcorn with a smoky BBQ drizzle.', defaults: ['mozzarella', 'chicken', 'onion', 'sweetcorn'], extras: ['mozzarella', ...VEG, ...MEAT] },
   { slug: 'chicken-tikka', name: 'Chicken Tikka', category: 'Signature', image: 'caramel-51Zn3bUmCa8-unsplash.jpg', prices: [900, 1300, 1750],
     description: 'Spiced tikka chicken, green peppers and onion. A Nairobi favourite.', defaults: ['mozzarella', 'chicken', 'green-peppers', 'onion'], extras: ['mozzarella', ...VEG, ...MEAT] },
-  { slug: 'meat-feast', name: 'Meat Feast', category: 'Signature', image: 'pranjall-kumar-oYkC51pOQBk-unsplash.jpg', prices: [950, 1400, 1900],
+  { slug: 'meat-feast', name: 'Meat Feast', category: 'Signature', image: 'web/hero5-1280.jpg', prices: [950, 1400, 1900],
     description: 'Pepperoni, beef, bacon and sausage for serious appetites.', defaults: ['mozzarella', 'pepperoni', 'beef', 'bacon', 'sausage'], extras: ['mozzarella', ...VEG, ...MEAT] },
 ];
 

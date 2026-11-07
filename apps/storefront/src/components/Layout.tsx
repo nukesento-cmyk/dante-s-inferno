@@ -4,6 +4,7 @@ import { formatKenyanPhone } from '@dantes/shared';
 import { useCart, useSettings } from '../hooks/queries';
 import { useCartStore } from '../store/cartStore';
 import { weeklyHours } from '../lib/hours';
+import { IdleScreen } from './IdleScreen';
 import { OpenBadge } from './OpenBadge';
 import { Wordmark } from './Wordmark';
 
@@ -102,6 +103,7 @@ export function Footer() {
 export function Layout() {
   const { pathname } = useLocation();
   const home = pathname === '/';
+  const { data: settings } = useSettings();
   return (
     <>
       <a href="#main" className="skip-link">Skip to content</a>
@@ -111,6 +113,7 @@ export function Layout() {
       </main>
       {/* the homepage renders its own final section footer */}
       {!home && <Footer />}
+      <IdleScreen badge={<OpenBadge settings={settings} />} />
     </>
   );
 }

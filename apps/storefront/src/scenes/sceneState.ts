@@ -11,4 +11,22 @@ export const sceneState = {
   highlight: null as string | null,
   mouseX: 0,
   mouseY: 0,
+  /** true while the idle/attract overlay covers the page: the 3D render loop stops. */
+  paused: false,
 };
+
+const listeners = new Set<() => void>();
+
+export function setScenePaused(paused: boolean) {
+  if (sceneState.paused === paused) return;
+  sceneState.paused = paused;
+  listeners.forEach((l) => l());
+}
+
+export function subscribeScenePaused(l: () => void) {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+}
+export const getScenePaused = () => sceneState.paused;

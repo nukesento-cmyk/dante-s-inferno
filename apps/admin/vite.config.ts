@@ -1,11 +1,10 @@
 import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   base: '/admin/',
-  // @vitejs/plugin-react@6 needs vite>=7 (imports 'vite/internal'); with vite 6 we use esbuild's automatic JSX runtime from tsconfig.
-  esbuild: { jsx: 'automatic' },
-  plugins: [tailwindcss()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5174,
     strictPort: true,

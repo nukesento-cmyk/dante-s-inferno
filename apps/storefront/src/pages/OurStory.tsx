@@ -15,8 +15,8 @@ export default function OurStory() {
         <img src="/images/narek-petrosyan--0nj85eRLPk-unsplash.jpg" alt="A freshly baked pizza topped with basil leaves" style={{ borderRadius: 20 }} loading="lazy" />
       </div>
       <div className="exp-photos" style={{ marginTop: 32 }}>
-        <img src="/images/idlePage.jpg" alt="A pizza resting in front of a glowing wood oven" loading="lazy" />
-        <img src="/images/aldward-castillo-mbDTDm_s9C0-unsplash.jpg" alt="Close-up of a pizza with basil and melted cheese" loading="lazy" />
+        <img src="/images/web/idle-1280.jpg" alt="A pizza resting in front of a glowing wood oven" loading="lazy" />
+        <img src="/images/web/hero3-1280.jpg" alt="Close-up of a pizza with basil and melted cheese" loading="lazy" />
         <img src="/images/faizan-saeed-8thte7ceLSw-unsplash.jpg" alt="A pizza on a wooden serving board" loading="lazy" />
       </div>
     </div>

@@ -8,6 +8,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "e2e": "pnpm --filter @dantes/e2e test",
     "db:start": "bash scripts/db.sh start",
     "db:stop": "bash scripts/db.sh stop",
     "format": "prettier --write ."

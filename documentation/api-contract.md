@@ -3,7 +3,7 @@
 This document is the contract between `apps/api`, `apps/storefront` and `apps/admin`. Change it only together with the code.
 
 - Base: `http://localhost:4000/api/v1`. In dev, both Vite apps proxy `/api` and `/uploads` to `:4000`, so the browser is always same-origin.
-- Swagger: `/api/docs`. Health: `GET /api/v1/health` → `{ status, db }`.
+- Swagger: `/api/docs` (not served in production). Health: `GET /api/v1/health` → `{ status, db }` (`503` with `{status:'degraded',db:'error'}` when the DB is down); readiness: `GET /api/v1/health/ready` → `{ status: 'ready'|'not_ready', db, seeded }` (503 when not ready).
 - Money is **integer KES cents** everywhere (`priceCents`, `totalCents`, ...). Phones are E.164 (`+2547…`).
 - Validation uses the zod schemas in `@dantes/shared`. Errors look like `{ statusCode, error, message, issues?: [{ path, message }] }`.
 - IDs are cuid strings. Lists are plain arrays unless they are paginated: `{ items, total, page, pageSize }` with `?page=&pageSize=`.
@@ -60,7 +60,7 @@ The guest cart token is created by `POST /cart` → `{ token, ...Cart }`. The st
 
 ## Payment provider callbacks
 
-- `POST /payments/mpesa/callback/:secret`: Daraja STK callback. Checks that the path secret matches `MPESA_CALLBACK_SECRET`. The result is confirmed with an STK Query (live mode) before marking the payment paid. Always replies `{ResultCode:0}`.
+- `POST /payments/mpesa/callback/:secret`: Daraja STK callback. Checks that the path secret matches `MPESA_CALLBACK_SECRET` (timing-safe); any other secret answers `404` and records nothing. The result is confirmed with an STK Query (live mode) before marking the payment paid. For the right secret it always replies `{ResultCode:0,ResultDesc:'Accepted'}`.
 - `POST /payments/paystack/webhook`: verifies `x-paystack-signature` (HMAC-SHA512) and then calls verify-transaction.
 - `GET /payments/paystack/return?reference=`: redirects to `STOREFRONT_URL/order/:reference`.
 - Mock mode only (`PAYMENTS_MODE=mock`): `POST /payments/mock/:paymentId/complete {success:boolean}`. The storefront shows "Simulate payment" buttons when `/public/settings` contains `paymentsMode: "mock"`.
@@ -110,3 +110,17 @@ Additions and notes:
 - Roles: MANAGER has everything except staff, with read-only settings (GET allowed, PUT is OWNER only). ORDER_STAFF: orders, payments (read) and the dashboard overview. KITCHEN: orders read plus PREPARING/READY transitions only.
 - Mock mode: card payments have no `redirectUrl`; the storefront uses the simulate buttons. `POST /payments/mock/:paymentId/complete` returns `{ status: "applied"|"duplicate"|"rejected", paymentStatus, orderStatus }`.
 - Uploaded images are served at `/uploads/<file>` (JPEG, PNG, WebP, GIF, AVIF; 5 MB max).
+
+## Sprint 10 changes (security and QA, implemented by apps/api)
+
+10. `POST /payments/mpesa/callback/:secret` with a wrong or unconfigured secret now returns `404 {statusCode,error,message}` (it used to return `200 {ResultCode:0}`) and records nothing.
+11. `GET /health` returns `503 { status: "degraded", db: "error" }` when the database does not answer within 2 s. New `GET /health/ready` → `200 { status: "ready", db: "ok", seeded: true }` or `503 { status: "not_ready", db, seeded }`.
+12. `GET /admin/customers/:id` returns `{ id, name, phone, email, createdAt, orderCount, totalSpentCents, addresses, orders }` (no `userId` / `updatedAt`).
+13. `POST /admin/uploads/image`: the file type is decided from the bytes (JPEG, PNG, GIF, WebP, AVIF); anything else is `400`, over 5 MB is `413`; the stored name is always a server-generated UUID plus the sniffed extension. Uploads are audited (`upload.image`). `POST /admin/settings/notifications/test` is audited (`notifications.test`).
+14. New error responses, all in the standard error shape: `403 "Origin not allowed"` (a browser `Origin` header on POST/PUT/PATCH/DELETE that is not `STOREFRONT_URL`/`ADMIN_URL`), `415 "Content-Type must be application/json"` (any body that is not JSON; exempt: `/admin/uploads/image` and the two payment webhooks), `413` (JSON body over 100 kb), `429` (rate limits).
+15. Rate limits per IP per minute: login, register, forgot-password and reset-password `LOGIN_RATE_LIMIT` (10); `POST /checkout` and `POST /orders/:reference/retry-payment` `CHECKOUT_RATE_LIMIT` (10); `GET /orders/:reference` `LOOKUP_RATE_LIMIT` (30); `GET /orders/:reference/payment-status` 4x `LOOKUP_RATE_LIMIT` (the confirmation page polls every 3 s). E2E and load tests that hammer one IP must raise these env vars.
+16. Passwords (customer register, reset-password, staff create/update) must pass the policy: 8-128 characters, not a repeated single character, not on a short common list, not containing the email or phone. Failures are `400` with `issues: [{ path: "password", message }]`.
+17. Responses under `/admin`, `/auth`, `/account`, `/orders`, `/checkout` and `/cart` carry `Cache-Control: no-store`. CORS allows only `GET, HEAD, POST, PUT, PATCH, DELETE` and the headers `Content-Type` and `X-Cart-Token`.
+18. Documentation fixes (existing behaviour): `OrderPublic.items[]` also carries `notes`; `GET /admin/overview` `topProducts[]` also carries `productId`; the SSE events carry an incrementing `id:` line.
+19. CSV export prefixes cells that start with `=`, `@`, tab, CR, or `+`/`-` followed by a non-digit with `'` (formula injection).
+20. The API refuses to boot in production when `JWT_SECRET` is short or default, when `PAYMENTS_MODE` is not `live` (unless `ALLOW_MOCK_PAYMENTS_IN_PRODUCTION=true`), when the live M-Pesa callback secret is weak, or when `STOREFRONT_URL` / `ADMIN_URL` are not `https://` URLs.

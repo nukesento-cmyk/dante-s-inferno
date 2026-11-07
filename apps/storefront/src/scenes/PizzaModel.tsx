@@ -1,9 +1,9 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { ContactShadows, useGLTF } from '@react-three/drei';
+import { ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { PIZZA_GLB_URL, usePizzaGlbAvailable } from './glbProbe';
+import { usePizzaGlbAvailable } from './glbProbe';
 import { cheeseEdge, cheeseHeight, makeCrustGeometry, makeDiscGeometry, sauceHeight } from './pizzaGeo';
 import { getPizzaTextures } from './pizzaTextures';
 import { hashString, makeToppingGeometry, mulberry32, toppingKind, toppingLook, type ToppingSpec } from './toppingGeo';
@@ -25,7 +25,7 @@ export interface PizzaModelProps {
 
 // Layer heights (assembled) and how far each lifts when exploded.
 const BASE = { dough: 0.07, crust: 0.1, sauce: 0.15, cheese: 0.165, toppings: 0.2 };
-const LIFT = { dough: 0, crust: 0.5, sauce: 1.0, cheese: 1.5, toppings: 2.1 };
+export const LIFT = { dough: 0, crust: 0.5, sauce: 1.0, cheese: 1.5, toppings: 2.1 };
 
 const WHITE = new THREE.Color('#ffffff');
 const CRUST_BAKED = new THREE.Color('#c58a52');
@@ -152,51 +152,8 @@ function ProceduralPizza({ toppings, exploded, getExploded, getBake, perTopping 
   );
 }
 
-/**
- * Optional scanned model at /models/pizza.glb. Named nodes (see MODELS.md) keep the explode animation and the
- * customizer's topping toggles working; an unnamed model is shown as one rigid piece.
- */
-function GlbPizza({ toppings, exploded, getExploded }: PizzaModelProps) {
-  const { scene } = useGLTF(PIZZA_GLB_URL);
-  const model = useMemo(() => {
-    const clone = scene.clone(true);
-    const box = new THREE.Box3().setFromObject(clone);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const scale = 2 / Math.max(size.x, size.z, 0.0001);
-    const holder = new THREE.Group();
-    clone.position.set(-center.x, -box.min.y, -center.z);
-    holder.add(clone);
-    holder.scale.setScalar(scale);
-    const layers: { node: THREE.Object3D; baseY: number; lift: number }[] = [];
-    const topNodes: { node: THREE.Object3D; key: string }[] = [];
-    clone.traverse((o) => {
-      const n = o.name.toLowerCase();
-      if (n in LIFT) layers.push({ node: o, baseY: o.position.y, lift: LIFT[n as keyof typeof LIFT] / scale });
-      else if (n.startsWith('topping_')) topNodes.push({ node: o, key: n.slice(8) });
-    });
-    return { holder, layers, topNodes, scale };
-  }, [scene]);
-
-  useEffect(() => {
-    if (!model.topNodes.length) return;
-    const wanted = new Set(toppings.flatMap((t) => [t.modelKey.toLowerCase(), toppingKind(t.modelKey)]));
-    model.topNodes.forEach(({ node, key }) => {
-      node.visible = wanted.has(key);
-    });
-  }, [model, toppings]);
-
-  useFrame(() => {
-    const e = getExploded ? getExploded() : exploded;
-    model.layers.forEach((l) => {
-      l.node.position.y = l.baseY + l.lift * e;
-    });
-    model.topNodes.forEach(({ node }, i) => {
-      node.position.y = (node.userData.baseY ??= node.position.y) + ((LIFT.toppings + i * 0.2) / model.scale) * e;
-    });
-  });
-  return <primitive object={model.holder} />;
-}
+// GLTFLoader / Draco / Meshopt are only downloaded when /models/pizza.glb exists.
+const GlbPizza = lazy(() => import('./GlbPizza'));
 
 function Boundary({ fallback, children }: { fallback: ReactNode; children: ReactNode }) {
   return (

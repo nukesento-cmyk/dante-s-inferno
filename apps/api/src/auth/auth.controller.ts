@@ -4,6 +4,7 @@ import { customerRegisterSchema, loginSchema } from '@dantes/shared';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { env } from '../config/env';
+import { withPasswordPolicy } from '../common/password-policy';
 import { zod } from '../common/zod.pipe';
 import { AuthService } from './auth.service';
 import type { AuthedRequest } from './auth.types';
@@ -11,7 +12,8 @@ import { CurrentStaff, RequireCustomer, Staff } from './guards';
 import type { StaffPrincipal } from './auth.types';
 
 const forgotSchema = z.object({ email: z.string().email() });
-const resetSchema = z.object({ token: z.string().min(10), password: z.string().min(8).max(128) });
+const resetSchema = withPasswordPolicy(z.object({ token: z.string().min(10).max(200), password: z.string().min(8).max(128) }), []);
+const registerSchema = withPasswordPolicy(customerRegisterSchema);
 const limit = { default: { limit: () => env.loginRateLimit, ttl: () => 60_000 } };
 
 type Login = z.infer<typeof loginSchema>;
@@ -44,7 +46,7 @@ export class AuthController {
   @Post('customer/register')
   @Throttle(limit)
   customerRegister(
-    @Body(zod(customerRegisterSchema)) body: z.infer<typeof customerRegisterSchema>,
+    @Body(zod(registerSchema)) body: z.infer<typeof customerRegisterSchema>,
     @Res({ passthrough: true }) res: Response,
     @Headers('x-cart-token') cartToken?: string,
   ) {

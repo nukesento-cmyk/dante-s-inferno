@@ -1,8 +1,12 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-brand: #ff6a00;
-  --color-brand-dark: #d95a00;
+  /* brand passes WCAG AA (4.9:1) with white text and on white; brand-light is for dark surfaces only */
+  --color-brand: #c24a00;
+  --color-brand-dark: #a03e00;
+  --color-brand-light: #ff6a00;
+  /* secondary text: AA (>=4.5:1) on both white and the #f6f5f2 page background */
+  --color-zinc-500: #63636b;
   --color-tomato: #e63a26;
   --color-cream: #fff4dc;
   --color-graphite: #1c1c21;
@@ -12,6 +16,6 @@
 
 html, body, #root { height: 100%; }
 body { background: #f6f5f2; color: #1c1c21; font-family: var(--font-sans); font-size: 14px; }
-:focus-visible { outline: 2px solid #ff6a00; outline-offset: 2px; }
+:focus-visible { outline: 2px solid #c24a00; outline-offset: 2px; }
 @keyframes pulse-new { 0%,100% { background-color: #fff4dc; } 50% { background-color: #ffe0b8; } }
 .row-new { animation: pulse-new 1.6s ease-in-out 3; }

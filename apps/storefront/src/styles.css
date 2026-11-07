@@ -49,7 +49,7 @@ main:focus { outline: none; }
 .muted { color: var(--muted); }
 .mt-3 { margin-top: .75rem; }
 .container-x { width: min(1180px, 100% - 32px); margin-inline: auto; }
-.page { padding: calc(var(--header-h) + 24px) 0 64px; min-height: 70vh; }
+.page { padding: calc(var(--header-h) + 24px) 0 64px; min-height: 100svh; }
 .plain { list-style: none; padding: 0; margin: 0; display: grid; gap: .4rem; }
 .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .eyebrow { font-family: var(--font-display); color: var(--ember); letter-spacing: .2em; font-size: .72rem; text-transform: uppercase; }

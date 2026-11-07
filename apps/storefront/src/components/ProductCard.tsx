@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { formatKes } from '@dantes/shared';
+import { optimizedImage, fallbackToOriginal } from '../lib/images';
 import type { ProductPublic } from '../services/types';
 
 export const fromPrice = (p: ProductPublic) => (p.prices.length ? Math.min(...p.prices.map((x) => x.priceCents)) : 0);
@@ -9,7 +10,7 @@ export function ProductCard({ product }: { product: ProductPublic }) {
     <article className="card product-card">
       <Link to={`/menu/${product.slug}`} className="card-img" aria-label={`${product.name} details`}>
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt={`${product.name} pizza`} loading="lazy" />
+          <img src={optimizedImage(product.imageUrl)} onError={fallbackToOriginal(product.imageUrl)} width={800} height={600} alt={`${product.name} pizza`} loading="lazy" />
         ) : (
           <div className="img-fallback" aria-hidden="true">DP</div>
         )}

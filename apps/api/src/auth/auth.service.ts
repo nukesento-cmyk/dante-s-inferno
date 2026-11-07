@@ -12,6 +12,9 @@ import { CUSTOMER_COOKIE, type CustomerPrincipal, STAFF_COOKIE, type StaffPrinci
 type Kind = 'STAFF' | 'CUSTOMER';
 const STAFF_TTL_S = 12 * 3600;
 const CUSTOMER_TTL_S = 30 * 24 * 3600;
+/** argon2id, 19 MiB / 2 passes is the OWASP minimum; we use 64 MiB / 3 passes. */
+export const ARGON2 = { type: argon2.argon2id, memoryCost: 65_536, timeCost: 3, parallelism: 1 } as const;
+let dummyHash: Promise<string> | undefined;
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 
 @Injectable()
@@ -23,14 +26,18 @@ export class AuthService {
   ) {}
 
   hash(password: string) {
-    return argon2.hash(password);
+    return argon2.hash(password, ARGON2);
   }
 
   private async checkCredentials(kind: Kind, email: string, password: string): Promise<User> {
     const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    const ok = user && user.kind === kind && user.active && (await argon2.verify(user.passwordHash, password).catch(() => false));
+    // Always run one argon2 verification so an unknown email costs the same as a wrong password (no timing oracle).
+    dummyHash ??= argon2.hash('dummy-password-for-timing', ARGON2);
+    const valid = await argon2.verify(user?.passwordHash ?? (await dummyHash), password).catch(() => false);
+    const ok = user && valid && user.kind === kind && user.active;
     if (!ok) throw new UnauthorizedException('Invalid email or password');
-    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const rehash = argon2.needsRehash(user.passwordHash, ARGON2);
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), ...(rehash && { passwordHash: await this.hash(password) }) } });
     return user;
   }
 
@@ -123,7 +130,8 @@ export class AuthService {
       data: { resetTokenHash: sha256(token), resetTokenExpires: new Date(Date.now() + 3600_000) },
     });
     const link = `${env.storefrontUrl}/reset-password?token=${token}`;
-    await this.email
+    // Not awaited: the response time must not reveal whether the address has an account.
+    void this.email
       .send(user.email, "Reset your Dante's Pizza password", `Hi ${user.name},\n\nReset your password here (valid for 1 hour): ${link}\n\nIf you did not ask for this, ignore this email.`)
       .catch(() => undefined);
   }

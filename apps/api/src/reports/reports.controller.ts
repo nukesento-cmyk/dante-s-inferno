@@ -13,7 +13,9 @@ const salesQuery = rangeQuery.extend({ groupBy: z.enum(['day', 'week', 'month'])
 type Range = z.infer<typeof rangeQuery>;
 
 const csv = (v: unknown) => {
-  const s = v === null || v === undefined ? '' : String(v);
+  let s = v === null || v === undefined ? '' : String(v);
+  // Spreadsheet formula injection: customer-controlled text must never start a formula when opened in Excel/Sheets.
+  if (/^[=@\t\r]|^[+-](?!\d)/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

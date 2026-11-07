@@ -2,12 +2,14 @@ import { BadRequestException, Body, ConflictException, Controller, Get, HttpCode
 import { staffUserSchema } from '@dantes/shared';
 import { AuthService } from '../auth/auth.service';
 import { AuditActor, Staff } from '../auth/guards';
+import { withPasswordPolicy } from '../common/password-policy';
 import { zod } from '../common/zod.pipe';
 import { type Actor, AuditService } from '../core/audit.service';
 import { PrismaService } from '../core/prisma.service';
 
 const select = { id: true, name: true, email: true, role: true, active: true, lastLoginAt: true, createdAt: true } as const;
 type StaffInput = typeof staffUserSchema._output;
+const staffBody = withPasswordPolicy(staffUserSchema, ['email']);
 
 @Controller('admin/staff')
 @Staff('OWNER')
@@ -24,7 +26,7 @@ export class StaffController {
   }
 
   @Post()
-  async create(@Body(zod(staffUserSchema)) body: StaffInput, @AuditActor() actor: Actor) {
+  async create(@Body(zod(staffBody)) body: StaffInput, @AuditActor() actor: Actor) {
     if (!body.password) throw new BadRequestException({ message: 'Validation failed', issues: [{ path: 'password', message: 'A password is required for new staff' }] });
     if (await this.prisma.user.findUnique({ where: { email: body.email.toLowerCase() } })) throw new ConflictException('That email is already in use');
     const user = await this.prisma.user.create({
@@ -36,7 +38,7 @@ export class StaffController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body(zod(staffUserSchema)) body: StaffInput, @AuditActor() actor: Actor) {
+  async update(@Param('id') id: string, @Body(zod(staffBody)) body: StaffInput, @AuditActor() actor: Actor) {
     const before = await this.prisma.user.findFirst({ where: { id, kind: 'STAFF' }, select });
     if (!before) throw new NotFoundException('Staff member not found');
     if (id === actor.id && (body.role !== before.role || !body.active)) throw new ConflictException('You cannot change your own role or deactivate yourself');

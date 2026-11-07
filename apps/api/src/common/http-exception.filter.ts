@@ -2,6 +2,12 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@n
 import { Prisma } from '@prisma/client';
 import { STATUS_CODES } from 'node:http';
 import type { Response } from 'express';
+import { maskSensitive } from './mask';
+
+function isClientHttpError(e: unknown): e is { status?: number; statusCode?: number; type?: string } {
+  const code = (e as { status?: unknown; statusCode?: unknown })?.status ?? (e as { statusCode?: unknown })?.statusCode;
+  return e instanceof Error && typeof code === 'number' && code >= 400 && code < 500;
+}
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -20,9 +26,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (exception.code === 'P2002') [statusCode, body] = [409, { message: 'That value already exists' }];
       else if (exception.code === 'P2025') [statusCode, body] = [404, { message: 'Not found' }];
       else if (exception.code === 'P2003') [statusCode, body] = [409, { message: 'Referenced record is in use or missing' }];
+    } else if (isClientHttpError(exception)) {
+      // body-parser / multer style errors (413 too large, 400 malformed JSON, ...)
+      statusCode = exception.status ?? exception.statusCode ?? 400;
+      body = { message: exception.type === 'entity.too.large' ? 'Request body is too large' : statusCode === 400 ? 'Malformed request body' : (STATUS_CODES[statusCode] ?? 'Error') };
     }
 
-    if (statusCode >= 500) this.logger.error(exception instanceof Error ? (exception.stack ?? exception.message) : String(exception));
+    if (statusCode >= 500) this.logger.error(maskSensitive(exception instanceof Error ? (exception.stack ?? exception.message) : String(exception)));
     if (res.headersSent) return;
     const { message, issues, code } = body as { message?: unknown; issues?: unknown; code?: unknown };
     res.status(statusCode).json({

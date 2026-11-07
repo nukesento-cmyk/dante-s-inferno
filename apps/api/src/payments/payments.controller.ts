@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Logger, Param, Post, Query, RawBodyRequest, Redirect, Req, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Logger, NotFoundException, Param, Post, Query, RawBodyRequest, Redirect, Req, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
@@ -42,11 +42,12 @@ export class PaymentsController {
   @Post('mpesa/callback/:secret')
   @HttpCode(200)
   async mpesaCallback(@Param('secret') secret: string, @Body() body: { Body?: { stkCallback?: StkCallback } }) {
+    // Anything but the configured path secret looks like a route that does not exist and records nothing.
+    if (!env.mpesa.callbackSecret || !sameSecret(secret, env.mpesa.callbackSecret)) {
+      this.logger.warn('M-Pesa callback with a bad secret rejected');
+      throw new NotFoundException();
+    }
     try {
-      if (!env.mpesa.callbackSecret || !sameSecret(secret, env.mpesa.callbackSecret)) {
-        this.logger.warn('M-Pesa callback with a bad secret ignored');
-        return ACK;
-      }
       const cb = body?.Body?.stkCallback;
       if (!cb?.CheckoutRequestID || env.paymentsMode !== 'live') return ACK;
       const payment = await this.prisma.payment.findUnique({ where: { providerRef: cb.CheckoutRequestID } });

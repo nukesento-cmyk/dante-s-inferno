@@ -4,6 +4,7 @@ import { formatKes } from '@dantes/shared';
 import { useCart } from '../hooks/queries';
 import { useTitle } from '../hooks/useTitle';
 import { removeCartItem, updateCartItem } from '../services/cart';
+import { optimizedImage, fallbackToOriginal } from '../lib/images';
 import { Empty, ErrorBox, Loading } from '../components/States';
 
 export default function CartPage() {
@@ -33,7 +34,7 @@ export default function CartPage() {
             <ul className="plain">
               {cart.items.map((i) => (
                 <li key={i.id} className="cart-line">
-                  {i.imageUrl ? <img src={i.imageUrl} alt={i.productName} /> : <div className="img-fallback" style={{ width: 84, height: 84 }}>DP</div>}
+                  {i.imageUrl ? <img src={optimizedImage(i.imageUrl)} onError={fallbackToOriginal(i.imageUrl)} alt={i.productName} /> : <div className="img-fallback" style={{ width: 84, height: 84 }}>DP</div>}
                   <div>
                     <h3 style={{ marginBottom: 4 }}>{i.productName}</h3>
                     <p className="muted" style={{ margin: 0 }}>{i.sizeName} · {i.crustName}</p>

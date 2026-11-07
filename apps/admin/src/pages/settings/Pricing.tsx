@@ -122,10 +122,11 @@ function PricingEditor({ data, readOnly }: { data: PricingPayload; readOnly: boo
         <div className="space-y-3">
           {draft.groups.map((g, gi) => (
             <details key={g.id} className="rounded-lg border border-zinc-200" open>
-              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 bg-zinc-50 px-3 py-2">
-                <span className="font-semibold">{g.name}</span>
-                <span className="w-44" onClick={(e) => e.preventDefault()}>{cell(`g:${g.id}`, g.surcharge, (v) => set((d) => { d.groups[gi]!.surcharge = v; }), `${g.name} group surcharge`)}</span>
-              </summary>
+              <summary className="cursor-pointer bg-zinc-50 px-3 py-2 font-semibold">{g.name}</summary>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-3 py-2 text-sm">
+                <span>Group price (default for every ingredient below)</span>
+                <span className="w-44">{cell(`g:${g.id}`, g.surcharge, (v) => set((d) => { d.groups[gi]!.surcharge = v; }), `${g.name} group surcharge`)}</span>
+              </div>
               <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
                 {draft.ingredients.map((i, ii) => i.groupId !== g.id ? null : (
                   <label key={i.id} className="flex items-center justify-between gap-2 text-sm">

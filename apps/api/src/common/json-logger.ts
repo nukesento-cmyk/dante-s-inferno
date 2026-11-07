@@ -1,4 +1,5 @@
 import { LoggerService } from '@nestjs/common';
+import { maskSensitive } from './mask';
 
 type Level = 'log' | 'error' | 'warn' | 'debug' | 'verbose' | 'fatal';
 
@@ -8,8 +9,8 @@ export class JsonLogger implements LoggerService {
       time: new Date().toISOString(),
       level,
       context,
-      msg: typeof message === 'string' ? message : message instanceof Error ? message.message : message,
-      ...(extra ? { extra } : {}),
+      msg: typeof message === 'string' ? maskSensitive(message) : message instanceof Error ? maskSensitive(message.message) : message,
+      ...(extra ? { extra: JSON.parse(maskSensitive(JSON.stringify(extra))) } : {}),
     });
     (level === 'error' || level === 'fatal' ? process.stderr : process.stdout).write(line + '\n');
   }

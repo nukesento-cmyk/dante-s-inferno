@@ -43,6 +43,8 @@ export class CustomersController {
       include: { addresses: true, orders: { orderBy: { createdAt: 'desc' }, include: { items: true } } },
     });
     if (!customer) throw new NotFoundException('Customer not found');
-    return customer;
+    const spent = customer.orders.filter((o) => REVENUE_STATUSES.includes(o.status));
+    const { id: _id, userId: _userId, updatedAt: _updatedAt, ...rest } = customer;
+    return { id: customer.id, ...rest, orderCount: spent.length, totalSpentCents: spent.reduce((sum, o) => sum + o.totalCents, 0) };
   }
 }

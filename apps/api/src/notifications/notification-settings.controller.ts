@@ -101,7 +101,7 @@ export class NotificationSettingsController {
   @Post('test')
   @HttpCode(200)
   @Staff('OWNER')
-  async test(@Body(zod(testNotificationSchema)) body: z.infer<typeof testNotificationSchema>) {
+  async test(@Body(zod(testNotificationSchema)) body: z.infer<typeof testNotificationSchema>, @AuditActor() actor: Actor) {
     const recipient = body.channel === 'EMAIL' ? body.recipient : normalizeKenyanPhone(body.recipient);
     if (!recipient) throw new BadRequestException('Enter a valid recipient');
     const n = await this.notifications.deliver({
@@ -111,6 +111,7 @@ export class NotificationSettingsController {
       subject: "Dante's Pizza test message",
       body: "This is a test message from Dante's Pizza admin.",
     });
+    await this.audit.log(actor, { action: 'notifications.test', entity: 'Notification', entityId: n.id, after: { channel: body.channel, status: n.status } });
     return { status: n.status, note: n.note, error: n.error };
   }
 

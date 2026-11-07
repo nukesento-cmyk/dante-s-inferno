@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dantes
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: dantes_test
+        ports: ['5434:5432']
+        options: >-
+          --health-cmd "pg_isready -U dantes" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://dantes@localhost:5434/dantes_test
+      DATABASE_URL_TEST: postgresql://dantes@localhost:5434/dantes_test
+      JWT_SECRET: ci-only-secret-at-least-32-characters-long
+      PAYMENTS_MODE: mock
+      MPESA_CALLBACK_SECRET: ci-callback-secret
+      STOREFRONT_URL: http://localhost:5173
+      ADMIN_URL: http://localhost:5174
+      PUBLIC_API_URL: http://localhost:4000
+      SEED_OWNER_EMAIL: owner@dantespizza.co.ke
+      SEED_OWNER_PASSWORD: ci-owner-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Migrate test database
+        run: pnpm --filter @dantes/api exec prisma migrate deploy
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test

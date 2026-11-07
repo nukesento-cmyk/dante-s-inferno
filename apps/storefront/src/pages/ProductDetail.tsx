@@ -3,6 +3,7 @@ import { formatKes } from '@dantes/shared';
 import { useMenu, useProduct } from '../hooks/queries';
 import { useTitle } from '../hooks/useTitle';
 import { ErrorBox, Loading } from '../components/States';
+import { optimizedImage, fallbackToOriginal } from '../lib/images';
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -16,7 +17,7 @@ export default function ProductDetail() {
       <Link to="/menu" className="muted">← All pizzas</Link>
       <div className="split split-eq" style={{ marginTop: 16 }}>
         <div className="card">
-          {p.imageUrl ? <img src={p.imageUrl} alt={`${p.name} pizza`} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} /> : <div className="img-fallback" style={{ aspectRatio: '4/3' }}>DP</div>}
+          {p.imageUrl ? <img src={optimizedImage(p.imageUrl)} onError={fallbackToOriginal(p.imageUrl)} alt={`${p.name} pizza`} style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover' }} /> : <div className="img-fallback" style={{ aspectRatio: '4/3' }}>DP</div>}
         </div>
         <div>
           <h1>{p.name}</h1>

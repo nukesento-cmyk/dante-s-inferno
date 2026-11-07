@@ -7,6 +7,7 @@ import { useTitle } from '../hooks/useTitle';
 import { addCartItem } from '../services/cart';
 import { crustsForSize, maxExtras, previewPrice } from '../customizer/preview';
 import { hasWebGL } from '../lib/webgl';
+import { optimizedImage, fallbackToOriginal } from '../lib/images';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ErrorBox, Loading } from '../components/States';
 
@@ -69,7 +70,7 @@ export default function Customize() {
 
   const toggleAdd = (id: string) => setAdded((a) => (a.includes(id) ? a.filter((x) => x !== id) : a.length < addAllowed ? [...a, id] : a));
   const toggleRemove = (id: string) => setRemoved((r) => (r.includes(id) ? r.filter((x) => x !== id) : [...r, id]));
-  const fallbackImg = product.imageUrl ? <img src={product.imageUrl} alt={`${product.name} pizza`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div className="img-fallback">DP</div>;
+  const fallbackImg = product.imageUrl ? <img src={optimizedImage(product.imageUrl)} onError={fallbackToOriginal(product.imageUrl)} alt={`${product.name} pizza`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div className="img-fallback">DP</div>;
 
   return (
     <div className="page container-x" style={{ paddingBottom: 0 }}>

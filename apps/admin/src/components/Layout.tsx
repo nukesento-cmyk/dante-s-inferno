@@ -1,11 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { authApi } from '../api/endpoints';
 import { useMe } from '../lib/auth';
 import { navForRole } from '../lib/roles';
 import { useSound } from '../store/sound';
-import { Button, cx } from './ui';
+import { Button, Loading, cx } from './ui';
 import { humanize } from '../lib/format';
 
 export function Layout() {
@@ -35,7 +35,7 @@ export function Layout() {
       >
         <div className="px-5 py-4">
           <div className="text-lg font-extrabold leading-tight text-white">
-            DANTE'S <span className="text-brand">PIZZA</span>
+            DANTE'S <span className="text-brand-light">PIZZA</span>
           </div>
           <div className="text-[11px] uppercase tracking-widest text-zinc-400">Admin Command Centre</div>
         </div>
@@ -77,7 +77,9 @@ export function Layout() {
           </button>
         </header>
         <main className="flex-1 overflow-x-hidden p-4 lg:p-6">
-          <Outlet />
+          <Suspense fallback={<Loading />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

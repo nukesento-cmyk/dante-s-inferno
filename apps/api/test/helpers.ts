@@ -90,3 +90,55 @@ export function checkout(app: INestApplication, token: string, body: Record<stri
     .set('X-Cart-Token', token)
     .send({ customer: CUSTOMER, fulfilment: 'COLLECTION', paymentMethod: 'MPESA', ...body });
 }
+
+export const API = '/api/v1';
+
+export async function waitFor<T>(fn: () => Promise<T | null | undefined | false>, ms = 4000): Promise<T | null | undefined | false> {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v || Date.now() > end) return v;
+    await new Promise((r) => setTimeout(r, 40));
+  }
+}
+
+/** Places a COLLECTION order for a pepperoni pizza (mock payments), optionally as a logged-in customer agent. */
+export async function placeOrder(
+  app: INestApplication,
+  cat: Awaited<ReturnType<typeof catalogue>>,
+  opts: { paymentMethod?: 'MPESA' | 'CARD'; customer?: { name: string; phone: string; email?: string }; agent?: ReturnType<typeof request.agent>; quantity?: number } = {},
+) {
+  const http = opts.agent ?? request(app.getHttpServer());
+  const token = ((await http.post(`${API}/cart`).expect(201)).body as { token: string }).token;
+  await http
+    .post(`${API}/cart/items`)
+    .set('X-Cart-Token', token)
+    .send({ productId: cat.product('pepperoni').id, sizeId: cat.size('M').id, crustId: cat.crust('Thin').id, quantity: opts.quantity ?? 1 })
+    .expect(201);
+  const res = await http
+    .post(`${API}/checkout`)
+    .set('X-Cart-Token', token)
+    .send({ customer: opts.customer ?? CUSTOMER, fulfilment: 'COLLECTION', paymentMethod: opts.paymentMethod ?? 'MPESA' })
+    .expect(201);
+  return { reference: res.body.order.reference as string, paymentId: res.body.payment.id as string, totalCents: res.body.order.totalCents as number };
+}
+
+export const mockComplete = (app: INestApplication, paymentId: string, success: boolean) =>
+  request(app.getHttpServer()).post(`${API}/payments/mock/${paymentId}/complete`).send({ success });
+
+/** Registers a customer and returns a cookie-keeping agent. */
+export async function customerAgent(app: INestApplication, over: Partial<{ name: string; email: string; phone: string; password: string }> = {}) {
+  const body = { name: 'Test Customer', email: `c${Math.random().toString(36).slice(2, 8)}@example.com`, phone: '0711222333', password: 'Sup3r-secret-pw', ...over };
+  const agent = request.agent(app.getHttpServer());
+  await agent.post(`${API}/auth/customer/register`).send(body).expect(201);
+  return { agent, ...body };
+}
+
+/** Minimal valid-by-magic-bytes image buffers. */
+export const IMAGES = {
+  png: Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32)]),
+  jpeg: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32)]),
+  gif: Buffer.concat([Buffer.from('GIF89a', 'latin1'), Buffer.alloc(32)]),
+  webp: Buffer.concat([Buffer.from('RIFF', 'latin1'), Buffer.alloc(4), Buffer.from('WEBP', 'latin1'), Buffer.alloc(32)]),
+  avif: Buffer.concat([Buffer.alloc(4), Buffer.from('ftypavif', 'latin1'), Buffer.alloc(32)]),
+};

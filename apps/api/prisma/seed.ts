@@ -52,17 +52,17 @@ interface ProductSeed {
 }
 
 const PRODUCTS: ProductSeed[] = [
-  { slug: 'margherita', name: 'Margherita', category: 'Classics', image: 'narek-petrosyan--0nj85eRLPk-unsplash.jpg', featured: true, prices: [650, 950, 1250],
+  { slug: 'margherita', name: 'Margherita', category: 'Classics', image: 'web/narek-petrosyan--0nj85eRLPk-unsplash-800.jpg', featured: true, prices: [650, 950, 1250],
     description: 'Tomato sauce, mozzarella and fresh basil. Simple and perfect.', defaults: ['mozzarella', 'tomato'], extras: ['mozzarella', ...VEG, ...MEAT] },
-  { slug: 'veggie-supreme', name: 'Veggie Supreme', category: 'Vegetarian', image: 'pranjall-kumar-sejqj6Eaqe8-unsplash.jpg', prices: [750, 1100, 1450],
+  { slug: 'veggie-supreme', name: 'Veggie Supreme', category: 'Vegetarian', image: 'web/pranjall-kumar-sejqj6Eaqe8-unsplash-800.jpg', prices: [750, 1100, 1450],
     description: 'Green peppers, mushrooms, onion, olives and sweetcorn on mozzarella.', defaults: ['mozzarella', 'green-peppers', 'mushrooms', 'onion', 'olives', 'sweetcorn'], extras: ['mozzarella', ...VEG] },
-  { slug: 'hawaiian', name: 'Hawaiian', category: 'Classics', image: 'heather-barnes-YKvGUO4Zb7Y-unsplash.jpg', prices: [800, 1150, 1550],
+  { slug: 'hawaiian', name: 'Hawaiian', category: 'Classics', image: 'web/heather-barnes-YKvGUO4Zb7Y-unsplash-800.jpg', prices: [800, 1150, 1550],
     description: 'Sweet pineapple and savoury sausage on a mozzarella base.', defaults: ['mozzarella', 'pineapple', 'sausage'], extras: ['mozzarella', ...VEG, ...MEAT] },
-  { slug: 'pepperoni', name: 'Pepperoni', category: 'Classics', image: 'fernando-andrade-_P76trHTWDE-unsplash.jpg', featured: true, prices: [850, 1250, 1650],
+  { slug: 'pepperoni', name: 'Pepperoni', category: 'Classics', image: 'web/fernando-andrade-_P76trHTWDE-unsplash-800.jpg', featured: true, prices: [850, 1250, 1650],
     description: 'Loaded with spicy pepperoni and bubbling mozzarella.', defaults: ['mozzarella', 'pepperoni'], extras: ['mozzarella', ...VEG, ...MEAT] },
-  { slug: 'bbq-chicken', name: 'BBQ Chicken', category: 'Signature', image: 'faizan-saeed-8thte7ceLSw-unsplash.jpg', featured: true, prices: [900, 1300, 1750],
+  { slug: 'bbq-chicken', name: 'BBQ Chicken', category: 'Signature', image: 'web/faizan-saeed-8thte7ceLSw-unsplash-800.jpg', featured: true, prices: [900, 1300, 1750],
     description: 'Grilled chicken, onion and sweetcorn with a smoky BBQ drizzle.', defaults: ['mozzarella', 'chicken', 'onion', 'sweetcorn'], extras: ['mozzarella', ...VEG, ...MEAT] },
-  { slug: 'chicken-tikka', name: 'Chicken Tikka', category: 'Signature', image: 'caramel-51Zn3bUmCa8-unsplash.jpg', prices: [900, 1300, 1750],
+  { slug: 'chicken-tikka', name: 'Chicken Tikka', category: 'Signature', image: 'web/caramel-51Zn3bUmCa8-unsplash-800.jpg', prices: [900, 1300, 1750],
     description: 'Spiced tikka chicken, green peppers and onion. A Nairobi favourite.', defaults: ['mozzarella', 'chicken', 'green-peppers', 'onion'], extras: ['mozzarella', ...VEG, ...MEAT] },
   { slug: 'meat-feast', name: 'Meat Feast', category: 'Signature', image: 'web/hero5-1280.jpg', prices: [950, 1400, 1900],
     description: 'Pepperoni, beef, bacon and sausage for serious appetites.', defaults: ['mozzarella', 'pepperoni', 'beef', 'bacon', 'sausage'], extras: ['mozzarella', ...VEG, ...MEAT] },

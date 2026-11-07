@@ -88,6 +88,9 @@ export default function Home() {
   const [section, setSection] = useState<SceneSection>('portal');
   const [picked, setPicked] = useState<string | null>(null);
   const [pastHero, setPastHero] = useState(false);
+  // The ~1 MB three.js chunk is only requested once the first paint is done and the browser is idle,
+  // so the hero photo (LCP) and the page's own JS are never competing with it.
+  const [sceneReady, setSceneReady] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   const ingredients = useMemo(() => {
@@ -107,6 +110,29 @@ export default function Home() {
   }, [menu]);
   const teaserProduct = menu?.products.find((p) => p.featured) ?? menu?.products[0];
   const shown = ingredients.find((i) => i.slug === picked);
+
+  useEffect(() => {
+    if (!rich) return;
+    let cancelled = false;
+    const go = () => { if (!cancelled) setSceneReady(true); };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (h: number) => void };
+    let idle: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const afterLoad = () => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (w.requestIdleCallback) idle = w.requestIdleCallback(go, { timeout: 2500 });
+        else timer = setTimeout(go, 800);
+      }));
+    };
+    if (document.readyState === 'complete') afterLoad();
+    else window.addEventListener('load', afterLoad, { once: true });
+    return () => {
+      cancelled = true;
+      window.removeEventListener('load', afterLoad);
+      if (idle !== undefined) w.cancelIdleCallback?.(idle);
+      clearTimeout(timer);
+    };
+  }, [rich]);
 
   // Mobile order bar appears once the hero has scrolled out of view.
   useEffect(() => {
@@ -200,7 +226,7 @@ export default function Home() {
         <div className="scene-canvas" style={{ opacity: sceneVisible ? 1 : 0 }} aria-hidden="true">
           <ErrorBoundary fallback={null}>
             <Suspense fallback={null}>
-              <HomeScene toppings={heroToppings} cloud={cloud} active={sceneVisible} />
+              {sceneReady && <HomeScene toppings={heroToppings} cloud={cloud} active={sceneVisible} />}
             </Suspense>
           </ErrorBoundary>
         </div>

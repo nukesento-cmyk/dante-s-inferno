@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { z } from 'zod';
 
 for (const file of [resolve(process.cwd(), '.env'), resolve(__dirname, '../../.env')]) {
   if (existsSync(file)) {
@@ -20,6 +21,10 @@ export const env = {
   get jwtSecret() { return str('JWT_SECRET', 'dev-secret'); },
   get paymentsMode() { return str('PAYMENTS_MODE', 'mock') === 'live' ? ('live' as const) : ('mock' as const); },
   get loginRateLimit() { return Number(str('LOGIN_RATE_LIMIT', '10')); },
+  /** Requests per minute per IP for checkout and payment retries. */
+  get checkoutRateLimit() { return Number(str('CHECKOUT_RATE_LIMIT', '10')); },
+  /** Requests per minute per IP for guest order lookups and payment polling. */
+  get lookupRateLimit() { return Number(str('LOOKUP_RATE_LIMIT', '30')); },
   get mpesa() {
     return {
       env: str('MPESA_ENV', 'sandbox'),
@@ -40,3 +45,56 @@ export const env = {
   get smtpUrl() { return str('SMTP_URL'); },
   get emailFrom() { return str('EMAIL_FROM', "Dante's Pizza <orders@dantespizza.co.ke>"); },
 };
+
+const WEAK_SECRETS = /^(change-?me|dev-secret|secret|password|jwt|test)/i;
+const url = z.string().url();
+const optionalNumber = z.string().regex(/^\d+$/, 'must be a whole number').optional();
+
+const envSchema = z
+  .object({
+    NODE_ENV: z.string().optional(),
+    DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+    API_PORT: z.string().regex(/^\d+$/, 'must be a port number').optional(),
+    PUBLIC_API_URL: url.optional(),
+    STOREFRONT_URL: url.optional(),
+    ADMIN_URL: url.optional(),
+    JWT_SECRET: z.string().optional(),
+    PAYMENTS_MODE: z.enum(['mock', 'live']).optional(),
+    ALLOW_MOCK_PAYMENTS_IN_PRODUCTION: z.enum(['true', 'false']).optional(),
+    LOGIN_RATE_LIMIT: optionalNumber,
+    CHECKOUT_RATE_LIMIT: optionalNumber,
+    LOOKUP_RATE_LIMIT: optionalNumber,
+    MPESA_ENV: z.enum(['sandbox', 'production']).optional(),
+    MPESA_CALLBACK_SECRET: z.string().optional(),
+    PAYSTACK_SECRET_KEY: z.string().optional(),
+  })
+  .passthrough()
+  .superRefine((v, ctx) => {
+    const issue = (path: string, message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+    if (v.NODE_ENV !== 'production') return;
+    const secret = v.JWT_SECRET ?? '';
+    if (secret.length < 32 || WEAK_SECRETS.test(secret)) issue('JWT_SECRET', 'must be a random value of at least 32 characters in production (e.g. openssl rand -base64 48)');
+    for (const key of ['STOREFRONT_URL', 'ADMIN_URL'] as const) {
+      if (!v[key]) issue(key, 'is required in production (it is the only allowed CORS origin)');
+      else if (!v[key]!.startsWith('https://')) issue(key, 'must be an https:// URL in production');
+    }
+    if (v.PAYMENTS_MODE !== 'live' && v.ALLOW_MOCK_PAYMENTS_IN_PRODUCTION !== 'true') {
+      issue('PAYMENTS_MODE', 'mock payments let any buyer mark their own order paid; set PAYMENTS_MODE=live in production');
+    }
+    if (v.PAYMENTS_MODE === 'live') {
+      if ((v.MPESA_CALLBACK_SECRET ?? '').length < 24 || WEAK_SECRETS.test(v.MPESA_CALLBACK_SECRET ?? '')) {
+        issue('MPESA_CALLBACK_SECRET', 'must be a random value of at least 24 characters when PAYMENTS_MODE=live');
+      }
+      if (!v.PAYSTACK_SECRET_KEY) issue('PAYSTACK_SECRET_KEY', 'is required when PAYMENTS_MODE=live');
+    }
+  });
+
+/** Validates the process environment. Throws one readable error listing every problem. Never prints secret values. */
+export function validateEnv(source: NodeJS.ProcessEnv = process.env) {
+  const result = envSchema.safeParse(source);
+  if (!result.success) {
+    const lines = result.error.issues.map((i) => `  - ${i.path.join('.') || 'env'}: ${i.message}`);
+    throw new Error(`Invalid environment configuration:\n${lines.join('\n')}`);
+  }
+  return result.data;
+}

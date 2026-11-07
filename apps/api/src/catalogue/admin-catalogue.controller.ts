@@ -23,18 +23,29 @@ import {
   sizeSchema,
   toppingGroupSchema,
 } from '@dantes/shared';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { AuditActor, Staff } from '../auth/guards';
 import { zod } from '../common/zod.pipe';
-import type { Actor } from '../core/audit.service';
+import { type Actor, AuditService } from '../core/audit.service';
 import { AdminCatalogueService } from './admin-catalogue.service';
 
 export const UPLOADS_DIR = resolve(__dirname, '..', '..', 'uploads');
-const IMAGE_TYPES: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif' };
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+/** Identifies an image by its magic bytes (the declared Content-Type and file name are ignored). Returns the extension, or null. */
+export function sniffImage(b: Buffer): string | null {
+  const ascii = (from: number, to: number) => b.subarray(from, to).toString('latin1');
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return '.jpg';
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return '.png';
+  if (b.length >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a')) return '.gif';
+  if (b.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return '.webp';
+  if (b.length >= 12 && ascii(4, 8) === 'ftyp' && ['avif', 'avis'].includes(ascii(8, 12))) return '.avif';
+  return null;
+}
 const reorderBody = z.object({ ids: z.array(z.string()).min(1) });
 const availabilityBody = z.object({ available: z.boolean() });
 const listQuery = z.object({ includeArchived: z.enum(['true', 'false']).optional() });
@@ -45,7 +56,10 @@ const body = <T extends z.ZodTypeAny>(s: T) => Body(zod(s));
 @Controller('admin')
 @Staff('OWNER', 'MANAGER')
 export class AdminCatalogueController {
-  constructor(private readonly svc: AdminCatalogueService) {}
+  constructor(
+    private readonly svc: AdminCatalogueService,
+    private readonly audit: AuditService,
+  ) {}
 
   // products
   @Get('products') products(@Query(zod(listQuery)) q: z.infer<typeof listQuery>) { return this.svc.listProducts(q.includeArchived === 'true'); }
@@ -58,21 +72,22 @@ export class AdminCatalogueController {
 
   @Post('uploads/image')
   @UseInterceptors(
+    // Memory storage: nothing touches the disk until the bytes are verified to be a real image.
     FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-      storage: diskStorage({
-        destination: (_req, _file, cb) => {
-          mkdirSync(UPLOADS_DIR, { recursive: true });
-          cb(null, UPLOADS_DIR);
-        },
-        filename: (_req, file, cb) => cb(null, `${randomUUID()}${IMAGE_TYPES[file.mimetype] ?? ''}`),
-      }),
-      fileFilter: (_req, file, cb) => (IMAGE_TYPES[file.mimetype] ? cb(null, true) : cb(new BadRequestException('Only JPEG, PNG, WebP, GIF or AVIF images are allowed') as unknown as Error, false)),
+      limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+      storage: memoryStorage(),
     }),
   )
-  upload(@UploadedFile() file?: Express.Multer.File) {
+  async upload(@UploadedFile() file: Express.Multer.File | undefined, @AuditActor() actor: Actor) {
     if (!file) throw new BadRequestException('Attach an image in the "file" field');
-    return { url: `/uploads/${file.filename}` };
+    const ext = sniffImage(file.buffer);
+    if (!ext) throw new BadRequestException('Only JPEG, PNG, WebP, GIF or AVIF images are allowed');
+    // The name is generated here and the extension comes from the sniffed bytes, never from the client.
+    const filename = `${randomUUID()}${ext}`;
+    await mkdir(UPLOADS_DIR, { recursive: true });
+    await writeFile(join(UPLOADS_DIR, filename), file.buffer, { flag: 'wx', mode: 0o644 });
+    await this.audit.log(actor, { action: 'upload.image', entity: 'Upload', entityId: filename, after: { filename, bytes: file.size, type: ext } });
+    return { url: `/uploads/${filename}` };
   }
 
   // categories

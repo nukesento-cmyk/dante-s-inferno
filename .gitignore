@@ -27,3 +27,6 @@ test-results/
 
 # Local Postgres cluster
 .pgdata/
+
+# Database backups (scripts/backup.sh)
+backups/

@@ -70,9 +70,11 @@ export default function OrderPage() {
     queryKey: ['pay-status', reference],
     queryFn: () => getPaymentStatus(reference),
     enabled: !!order,
+    // Keep polling after payment so kitchen progress (accepted, preparing, ...) shows without a reload.
     refetchInterval: (q) => {
-      const s = q.state.data?.status;
-      return s === 'SUCCEEDED' || s === 'FAILED' || s === 'CANCELLED' ? false : 3000;
+      const { status, orderStatus } = q.state.data ?? {};
+      if (orderStatus === 'COMPLETED' || orderStatus === 'CANCELLED') return false;
+      return status === 'SUCCEEDED' ? 5000 : status === 'FAILED' || status === 'CANCELLED' ? false : 3000;
     },
   });
   const ps = statusQ.data;

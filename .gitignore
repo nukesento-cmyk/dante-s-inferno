@@ -1,0 +1,29 @@
+# Private project spec
+README
+
+# Dependencies and builds
+node_modules/
+dist/
+build/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Uploads and runtime data
+apps/api/uploads/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
+playwright-report/
+test-results/
+
+# Local Postgres cluster
+.pgdata/
